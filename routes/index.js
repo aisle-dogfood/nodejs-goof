@@ -137,7 +137,17 @@ function parse(todo) {
     var time = t.slice(reminder + remindToken.length);
     time = time.replace(/\n$/, '');
 
-    var period = hms(time);
+    // Defense-in-depth: `humanize-ms` delegates parsing to `ms(str)`.
+    // Older `ms` versions have a regex-based ReDoS in their string parse path.
+    // `ms@>=2` caps parse input length at 100 chars; mirror that here.
+    var period;
+    if (typeof time === 'string' && time.length <= 100) {
+      try {
+        period = hms(time);
+      } catch (e) {
+        period = undefined;
+      }
+    }
 
     console.log('period: ' + period);
 
