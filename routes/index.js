@@ -11,6 +11,22 @@ var moment = require('moment');
 var exec = require('child_process').exec;
 var validator = require('validator');
 
+// Only allow expected form fields to become template locals.
+// This prevents user-controlled bodies from overriding hbs/Handlebars render options
+// such as `layout`/`partials` (which could otherwise lead to local file disclosure).
+var ACCOUNT_PROFILE_FIELDS = ['email', 'phone', 'firstname', 'lastname', 'country'];
+
+function pickAccountProfile(body) {
+  var profile = {};
+  for (var i = 0; i < ACCOUNT_PROFILE_FIELDS.length; i++) {
+    var key = ACCOUNT_PROFILE_FIELDS[i];
+    if (Object.prototype.hasOwnProperty.call(body, key)) {
+      profile[key] = body[key];
+    }
+  }
+  return profile;
+}
+
 // zip-slip
 var fileType = require('file-type');
 var AdmZip = require('adm-zip');
@@ -89,7 +105,7 @@ exports.get_account_details = function(req, res, next) {
 
 exports.save_account_details = function(req, res, next) {
   // get the profile details from the JSON
-	const profile = req.body
+	const profile = pickAccountProfile(req.body || {})
   // validate the input
   if (validator.isEmail(profile.email, { allow_display_name: true })
     // allow_display_name allows us to receive input as:
