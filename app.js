@@ -69,7 +69,7 @@ app.delete('/chat', routes.chat.delete);
 app.use('/users', routesUsers)
 
 // Static
-app.use(st({ path: './public', url: '/public' }));
+app.use(st({ path: path.join(__dirname, 'public'), url: '/public' }));
 
 // Add the option to output (sanitized!) markdown
 marked.setOptions({ sanitize: true });
