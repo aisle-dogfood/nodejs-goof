@@ -36,20 +36,24 @@ exports.index = function (req, res, next) {
 };
 
 exports.loginHandler = function (req, res, next) {
-  if (validator.isEmail(req.body.username)) {
-    User.find({ username: req.body.username, password: req.body.password }, function (err, users) {
-      if (users.length > 0) {
-        const redirectPage = req.body.redirectPage
-        const session = req.session
-        const username = req.body.username
-        return adminLoginSuccess(redirectPage, session, username, res)
-      } else {
-        return res.status(401).send()
-      }
-    });
-  } else {
-    return res.status(401).send()
+  // body-parser >=1.10 may set req.body = {} on missing body/type mismatch.
+  // Guard validator calls to avoid throwing on undefined.
+  const username = (req.body && typeof req.body.username === 'string') ? req.body.username : '';
+  const password = (req.body && typeof req.body.password === 'string') ? req.body.password : '';
+  const redirectPage = (req.body && typeof req.body.redirectPage === 'string') ? req.body.redirectPage : undefined;
+
+  if (!validator.isEmail(username)) {
+    return res.status(401).send();
   }
+
+  User.find({ username, password }, function (err, users) {
+    if (users && users.length > 0) {
+      const session = req.session;
+      return adminLoginSuccess(redirectPage, session, username, res);
+    } else {
+      return res.status(401).send();
+    }
+  });
 };
 
 function adminLoginSuccess(redirectPage, session, username, res) {
@@ -88,26 +92,39 @@ exports.get_account_details = function(req, res, next) {
 }
 
 exports.save_account_details = function(req, res, next) {
-  // get the profile details from the JSON
-	const profile = req.body
-  // validate the input
-  if (validator.isEmail(profile.email, { allow_display_name: true })
-    // allow_display_name allows us to receive input as:
-    // Display Name <email-address>
-    // which we consider valid too
-    && validator.isMobilePhone(profile.phone, 'he-IL')
-    && validator.isAscii(profile.firstname)
-    && validator.isAscii(profile.lastname)
-    && validator.isAscii(profile.country)
-  ) {
-    // trim any extra spaces on the right of the name
-    profile.firstname = validator.rtrim(profile.firstname)
-    profile.lastname = validator.rtrim(profile.lastname)
+  // body-parser >=1.10 may set req.body = {} on missing body/type mismatch.
+  // Guard validator calls to avoid throwing on undefined/non-string input.
+  const profile = (req.body && typeof req.body === 'object') ? req.body : {}
 
-    // render the view
-    return res.render('account.hbs', profile)
-  } else {
-    // if input validation fails, we just render the view as is
+  try {
+    const email = (typeof profile.email === 'string') ? profile.email : ''
+    const phone = (typeof profile.phone === 'string') ? profile.phone : ''
+    const firstname = (typeof profile.firstname === 'string') ? profile.firstname : ''
+    const lastname = (typeof profile.lastname === 'string') ? profile.lastname : ''
+    const country = (typeof profile.country === 'string') ? profile.country : ''
+
+    // validate the input
+    if (validator.isEmail(email, { allow_display_name: true })
+      // allow_display_name allows us to receive input as:
+      // Display Name <email-address>
+      // which we consider valid too
+      && validator.isMobilePhone(phone, 'he-IL')
+      && validator.isAscii(firstname)
+      && validator.isAscii(lastname)
+      && validator.isAscii(country)
+    ) {
+      // trim any extra spaces on the right of the name
+      profile.firstname = validator.rtrim(firstname)
+      profile.lastname = validator.rtrim(lastname)
+
+      // render the view
+      return res.render('account.hbs', profile)
+    } else {
+      // if input validation fails, we just render the view as is
+      console.log('error in form details')
+      return res.render('account.hbs')
+    }
+  } catch (e) {
     console.log('error in form details')
     return res.render('account.hbs')
   }
