@@ -36,20 +36,26 @@ exports.index = function (req, res, next) {
 };
 
 exports.loginHandler = function (req, res, next) {
-  if (validator.isEmail(req.body.username)) {
-    User.find({ username: req.body.username, password: req.body.password }, function (err, users) {
-      if (users.length > 0) {
-        const redirectPage = req.body.redirectPage
-        const session = req.session
-        const username = req.body.username
-        return adminLoginSuccess(redirectPage, session, username, res)
-      } else {
-        return res.status(401).send()
-      }
-    });
-  } else {
-    return res.status(401).send()
+  // Ensure user-controlled fields are strings to prevent selector injection
+  // (for example `{ "$ne": null }`) and legacy BSON edge cases.
+  const username = (req.body && typeof req.body.username === 'string') ? req.body.username : '';
+  const password = (req.body && typeof req.body.password === 'string') ? req.body.password : '';
+  const redirectPage = (req.body && typeof req.body.redirectPage === 'string') ? req.body.redirectPage : undefined;
+
+  if (!validator.isEmail(username)) {
+    return res.status(401).send();
   }
+
+  User.findOne({ username: username, password: password }, function (err, user) {
+    if (err) return next(err);
+
+    if (user) {
+      const session = req.session;
+      return adminLoginSuccess(redirectPage, session, username, res);
+    }
+
+    return res.status(401).send();
+  });
 };
 
 function adminLoginSuccess(redirectPage, session, username, res) {
@@ -129,10 +135,12 @@ exports.logout = function (req, res, next) {
 }
 
 function parse(todo) {
-  var t = todo;
+  // Ensure we always operate on a string. Older code paths could pass numbers,
+  // which later get written into a Buffer field.
+  var t = (todo === undefined || todo === null) ? '' : String(todo);
 
   var remindToken = ' in ';
-  var reminder = t.toString().indexOf(remindToken);
+  var reminder = t.indexOf(remindToken);
   if (reminder > 0) {
     var time = t.slice(reminder + remindToken.length);
     time = time.replace(/\n$/, '');
@@ -170,8 +178,12 @@ exports.create = function (req, res, next) {
     item = parse(item);
   }
 
+  // Always write a Buffer. Prevents numeric input from being cast to a Buffer
+  // length (historically led to uninitialized memory exposure in older stacks).
+  var contentBuf = Buffer.isBuffer(item) ? item : Buffer.from(String(item), 'utf8');
+
   new Todo({
-    content: item,
+    content: contentBuf,
     updated_at: Date.now(),
   }).save(function (err, todo, count) {
     if (err) return next(err);
@@ -190,14 +202,14 @@ exports.create = function (req, res, next) {
 
 exports.destroy = function (req, res, next) {
   Todo.findById(req.params.id, function (err, todo) {
+    if (err) return next(err);
+    if (!todo) return res.redirect('/');
 
-    try {
-      todo.remove(function (err, todo) {
-        if (err) return next(err);
-        res.redirect('/');
-      });
-    } catch (e) {
-    }
+    // `remove()` is deprecated in modern Mongoose; use deleteOne()
+    todo.deleteOne(function (err) {
+      if (err) return next(err);
+      res.redirect('/');
+    });
   });
 };
 
@@ -219,7 +231,8 @@ exports.edit = function (req, res, next) {
 exports.update = function (req, res, next) {
   Todo.findById(req.params.id, function (err, todo) {
 
-    todo.content = req.body.content;
+    var updatedContent = (req.body && req.body.content !== undefined) ? req.body.content : '';
+    todo.content = Buffer.isBuffer(updatedContent) ? updatedContent : Buffer.from(String(updatedContent), 'utf8');
     todo.updated_at = Date.now();
     todo.save(function (err, todo, count) {
       if (err) return next(err);
@@ -291,8 +304,9 @@ exports.import = function (req, res, next) {
         item += ' [' + d.format(format) + ']';
       }
 
+      var contentBuf = Buffer.isBuffer(item) ? item : Buffer.from(String(item), 'utf8');
       new Todo({
-        content: item,
+        content: contentBuf,
         updated_at: Date.now(),
       }).save(function (err, todo, count) {
         if (err) return next(err);
