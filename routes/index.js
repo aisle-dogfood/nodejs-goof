@@ -239,6 +239,44 @@ function isBlank(str) {
   return (!str || /^\s*$/.test(str));
 }
 
+// Treat values from /import as untrusted input.
+// - locale: restrict to already-available Moment locales (prevents path traversal via locale loading)
+// - when: strict-parse only ISO 8601 / RFC 2822 with a hard length limit (mitigates ReDoS)
+function normalizeImportLocale(input) {
+  if (typeof input !== 'string') return 'en';
+  var trimmed = input.trim();
+
+  // Locale identifiers are expected to look like: en, fr, en-gb, zh-cn, ...
+  if (!/^[A-Za-z]{2,3}(-[A-Za-z]{2,4})?$/.test(trimmed)) return 'en';
+
+  var normalized = trimmed.toLowerCase();
+  var available = (typeof moment.locales === 'function') ? moment.locales() : ['en'];
+
+  // Only allow locales that are already loaded in this process. This avoids any
+  // dynamic locale loading behavior from untrusted strings.
+  return available.indexOf(normalized) !== -1 ? normalized : 'en';
+}
+
+function normalizeImportFormat(input) {
+  if (typeof input !== 'string') return null;
+  var trimmed = input.trim();
+  if (trimmed.length === 0 || trimmed.length > 64) return null;
+  if (!validator.isAscii(trimmed)) return null;
+  return trimmed;
+}
+
+function safeParseImportDate(input) {
+  if (typeof input !== 'string') return null;
+  var trimmed = input.trim();
+  if (trimmed.length === 0 || trimmed.length > 100) return null;
+
+  var allowedInputFormats = [moment.ISO_8601];
+  if (moment.RFC_2822) allowedInputFormats.push(moment.RFC_2822);
+
+  var d = moment(trimmed, allowedInputFormats, true);
+  return d.isValid() ? d : null;
+}
+
 exports.import = function (req, res, next) {
   if (!req.files) {
     res.send('No files were uploaded.');
@@ -284,11 +322,15 @@ exports.import = function (req, res, next) {
     var item = what;
     if (!isBlank(what)) {
       if (!isBlank(when) && !isBlank(locale) && !isBlank(format)) {
-        console.log('setting locale ' + parts[1]);
-        moment.locale(locale);
-        var d = moment(when);
-        console.log('formatting ' + d);
-        item += ' [' + d.format(format) + ']';
+        var safeLocale = normalizeImportLocale(locale);
+        var safeFormat = normalizeImportFormat(format);
+        var d = safeParseImportDate(when);
+
+        if (d && safeFormat) {
+          // Set locale on the instance (avoid changing the process-wide global locale).
+          d.locale(safeLocale);
+          item += ' [' + d.format(safeFormat) + ']';
+        }
       }
 
       new Todo({
