@@ -2,11 +2,10 @@
 // is able to navigate to cross-file paths in the vuln description 
 /** 
 module.exports.adminLoginSuccess = function(redirectPage, res) {
+    const utils = require('../utils')
     console.log({redirectPage})
-    if (redirectPage) {
-        return res.redirect(redirectPage)
-    } else {
-        return res.redirect('/admin')
-    }
+
+    // Only allow in-app redirects to avoid open-redirects.
+    return res.redirect(utils.safeRedirectPath(redirectPage, '/admin'))
 }
 */
