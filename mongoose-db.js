@@ -42,17 +42,21 @@ if (mongoCFUri) {
 
 console.log("Using Mongo URI " + mongoUri);
 
-mongoose.connect(mongoUri);
-
-User = mongoose.model('User');
-User.find({ username: 'admin@snyk.io' }).exec(function (err, users) {
+// Mongoose 6+ connect() returns a native Promise. Ensure initial queries run
+// only after establishing a connection.
+mongoose.connect(mongoUri).then(function () {
+  User = mongoose.model('User');
+  return User.find({ username: 'admin@snyk.io' }).exec();
+}).then(function (users) {
   console.log(users);
   if (users.length === 0) {
     console.log('no admin');
-    new User({ username: 'admin@snyk.io', password: 'SuperSecretPassword' }).save(function (err, user, count) {
-      if (err) {
-        console.log('error saving admin user');
-      }
+    return new User({ username: 'admin@snyk.io', password: 'SuperSecretPassword' }).save().catch(function (err) {
+      console.log('error saving admin user');
+      console.log(err);
     });
   }
+}).catch(function (err) {
+  console.error('Mongo connection/seed error');
+  console.error(err);
 });
