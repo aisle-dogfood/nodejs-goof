@@ -306,12 +306,20 @@ exports.import = function (req, res, next) {
 
 exports.about_new = function (req, res, next) {
   console.log(JSON.stringify(req.query));
-  return res.render("about_new.dust",
-    {
-      title: 'Patch TODO List',
-      subhead: 'Vulnerabilities at their best',
-      device: req.query.device
-    });
+
+  // Avoid passing attacker-controlled objects into the Dust rendering context.
+  // Express query parsing can yield non-string values (arrays/objects) for keys like
+  // `device[__proto__][x]=y`, which can be used to trigger prototype pollution in
+  // vulnerable template engines.
+  let device = req.query.device;
+  if (Array.isArray(device)) device = device[0];
+  if (typeof device !== 'string') device = '';
+
+  return res.render("about_new.dust", {
+    title: 'Patch TODO List',
+    subhead: 'Vulnerabilities at their best',
+    device,
+  });
 };
 
 // Prototype Pollution
