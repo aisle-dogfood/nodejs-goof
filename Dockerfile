@@ -10,4 +10,6 @@ RUN npm update
 RUN npm install
 EXPOSE 3001
 EXPOSE 9229
+RUN groupadd -r goofuser && useradd -r -g goofuser goofuser
+USER goofuser
 ENTRYPOINT ["npm", "start"]
