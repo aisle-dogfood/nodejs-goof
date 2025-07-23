@@ -72,8 +72,21 @@ app.use('/users', routesUsers)
 app.use(st({ path: './public', url: '/public' }));
 
 // Add the option to output (sanitized!) markdown
-marked.setOptions({ sanitize: true });
-app.locals.marked = marked;
+marked.setOptions({ 
+  sanitize: true,
+  // Additional security options
+  gfm: true,
+  breaks: true,
+  smartLists: true
+});
+
+// Create a wrapper for marked that applies our custom sanitization
+var utils = require('./utils');
+var secureMarked = function(content) {
+  return marked(utils.sanitizeMarkdown(content));
+};
+
+app.locals.marked = secureMarked;
 
 // development only
 if (app.get('env') == 'development') {
