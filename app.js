@@ -46,7 +46,27 @@ app.use(session({
 }))
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
-app.use(fileUpload());
+app.use(fileUpload({
+  useTempFiles: false,  // Ensure we keep using memory buffers as in 0.0.5
+  parseNested: false,   // Disable nested parsing to maintain original behavior
+  safeFileNames: false, // Keep original filenames as in 0.0.5
+  abortOnLimit: false,  // Maintain original behavior for file size limits
+  createParentPath: false, // Maintain original behavior
+  debug: false          // Disable debug logging
+}));
+
+// Add error handling for Content-Type validation
+app.use(function(err, req, res, next) {
+  if (err && err.code === 'EBADCSRFTOKEN') {
+    // Handle CSRF token errors
+    res.status(403).send('Form tampered with');
+  } else if (err && err.status === 400) {
+    // Handle express-fileupload errors (like invalid content-type)
+    res.status(400).send('Bad request: ' + (err.message || 'Invalid upload request'));
+  } else {
+    next(err);
+  }
+});
 
 // Routes
 app.use(routes.current_user);

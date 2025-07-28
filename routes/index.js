@@ -244,7 +244,13 @@ exports.import = function (req, res, next) {
     return;
   }
 
-  var importFile = req.files.importFile;
+  // Handle the case where req.files.importFile might be an array (0.0.7 change)
+  let importFile = req.files.importFile;
+  if (Array.isArray(importFile)) {
+    // Use the first file if multiple were uploaded
+    importFile = importFile[0];
+  }
+
   var data;
   var importedFileType = fileType(importFile.data);
   var zipFileExt = { ext: "zip", mime: "application/zip" };
