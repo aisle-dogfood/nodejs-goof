@@ -42,7 +42,13 @@ app.use(methodOverride());
 app.use(session({
   secret: 'keyboard cat',
   name: 'connect.sid',
-  cookie: { path: '/' }
+  cookie: { 
+    path: '/',
+    httpOnly: true,     // Add this to prevent client-side JS from accessing the cookie
+    secure: process.env.NODE_ENV === 'production'  // Add this for HTTPS environments
+  },
+  resave: false,        // Add this to leverage the fix in 1.17.3
+  saveUninitialized: false  // Add this to prevent creating empty sessions
 }))
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
