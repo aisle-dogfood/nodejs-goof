@@ -15,6 +15,7 @@ var validator = require('validator');
 var fileType = require('file-type');
 var AdmZip = require('adm-zip');
 var fs = require('fs');
+var path = require('path');
 
 // prototype-pollution
 var _ = require('lodash');
@@ -238,6 +239,35 @@ function isBlank(str) {
   return (!str || /^\s*$/.test(str));
 }
 
+/**
+ * Safely extracts a zip file to a target directory
+ * @param {Buffer} zipData - The zip file data as a buffer
+ * @param {string} targetPath - The path to extract files to
+ * @returns {Promise<string>} - Path to the extracted files or error message
+ */
+function safelyExtractZip(zipData, targetPath) {
+  return new Promise((resolve, reject) => {
+    try {
+      // Create a new AdmZip instance
+      const zip = new AdmZip(zipData);
+      
+      // Ensure the extraction directory exists
+      if (!fs.existsSync(targetPath)) {
+        fs.mkdirSync(targetPath, { recursive: true });
+      }
+      
+      // Extract all files (overwrite existing files)
+      // In 0.5.2, this function sanitizes paths to prevent directory traversal
+      zip.extractAllTo(targetPath, true);
+      
+      resolve(targetPath);
+    } catch (error) {
+      console.error('Error extracting zip file:', error);
+      reject(error.message || 'Failed to extract zip file');
+    }
+  });
+}
+
 exports.import = function (req, res, next) {
   if (!req.files) {
     res.send('No files were uploaded.');
@@ -251,21 +281,48 @@ exports.import = function (req, res, next) {
   if (importedFileType === null) {
     importedFileType = { ext: "txt", mime: "text/plain" };
   }
+  
   if (importedFileType["mime"] === zipFileExt["mime"]) {
-    var zip = AdmZip(importFile.data);
     var extracted_path = "/tmp/extracted_files";
-    zip.extractAllTo(extracted_path, true);
-    data = "No backup.txt file found";
-    fs.readFile('backup.txt', 'ascii', function (err, data) {
-      if (!err) {
-        data = data;
-      }
-    });
+    
+    // Use the new safe extraction function
+    safelyExtractZip(importFile.data, extracted_path)
+      .then(function(extractedPath) {
+        // Read the backup.txt file from the extracted path
+        fs.readFile(path.join(extractedPath, 'backup.txt'), 'ascii', function (err, fileData) {
+          if (!err) {
+            processImportData(fileData, res);
+          } else {
+            // Handle case where backup.txt doesn't exist
+            console.log('No backup.txt file found:', err);
+            processImportData("No backup.txt file found", res);
+          }
+        });
+      })
+      .catch(function(error) {
+        // Handle extraction errors
+        console.error('Import failed:', error);
+        res.status(400).send('Import failed: ' + error);
+      });
   } else {
+    // Handle non-zip files
     data = importFile.data.toString('ascii');
+    processImportData(data, res);
   }
+};
+
+/**
+ * Process the imported data and create todo items
+ * @param {string} data - The data to process
+ * @param {object} res - The response object
+ */
+function processImportData(data, res) {
   var lines = data.split('\n');
+  var importCount = 0;
+  
   lines.forEach(function (line) {
+    if (!line.trim()) return; // Skip empty lines
+    
     var parts = line.split(',');
     var what = parts[0];
     console.log('importing ' + what);
@@ -273,9 +330,10 @@ exports.import = function (req, res, next) {
     var locale = parts[2];
     var format = parts[3];
     var item = what;
+    
     if (!isBlank(what)) {
       if (!isBlank(when) && !isBlank(locale) && !isBlank(format)) {
-        console.log('setting locale ' + parts[1]);
+        console.log('setting locale ' + locale);
         moment.locale(locale);
         var d = moment(when);
         console.log('formatting ' + d);
@@ -284,14 +342,18 @@ exports.import = function (req, res, next) {
 
       new Todo({
         content: item,
-        updated_at: Date.now(),
+        updated_at: Date.now()
       }).save(function (err, todo, count) {
-        if (err) return next(err);
-        console.log('added ' + todo);
+        if (err) {
+          console.error('Error saving imported todo:', err);
+        } else {
+          importCount++;
+        }
       });
     }
   });
-
+  
+  // Redirect to home page after import
   res.redirect('/');
 };
 
