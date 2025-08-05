@@ -1,0 +1,29 @@
+FROM public.ecr.aws/docker/library/node:18-alpine
+
+# Create app directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apk add --no-cache --update python3 make g++
+
+# Create a non-root user
+RUN adduser -D app && \
+    mkdir -p /home/app/.npm && \
+    chown -R app:app /home/app && \
+    chown -R app:app /app
+
+# Set environment variables
+ENV PATH="/home/app/.local/bin:$PATH"
+
+# Switch to non-root user
+USER app
+
+# Copy package files
+COPY --chown=app:app package*.json ./
+
+# Install dependencies and add Jest for testing
+RUN npm install && \
+    npm install --save-dev jest
+
+# Copy project files
+COPY --chown=app:app . .
