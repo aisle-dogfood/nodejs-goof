@@ -1,0 +1,24 @@
+FROM public.ecr.aws/docker/library/node:18-alpine
+
+# Set up working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Create a non-root user with a home directory
+RUN adduser -D app && \
+    chown -R app:app /app
+
+# Switch to non-root user
+USER app
+
+# Set PATH to include user's local bin directory
+ENV PATH="/home/app/.local/bin:$PATH"
+
+# Install dependencies
+RUN npm install
+
+# Copy project files
+COPY --chown=app:app . .
+USER app
