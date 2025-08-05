@@ -252,15 +252,20 @@ exports.import = function (req, res, next) {
     importedFileType = { ext: "txt", mime: "text/plain" };
   }
   if (importedFileType["mime"] === zipFileExt["mime"]) {
-    var zip = AdmZip(importFile.data);
-    var extracted_path = "/tmp/extracted_files";
-    zip.extractAllTo(extracted_path, true);
-    data = "No backup.txt file found";
-    fs.readFile('backup.txt', 'ascii', function (err, data) {
-      if (!err) {
-        data = data;
-      }
-    });
+    try {
+      var zip = new AdmZip(importFile.data);
+      var extracted_path = "/tmp/extracted_files";
+      zip.extractAllTo(extracted_path, true, null); // Added null as password parameter
+      data = "No backup.txt file found";
+      fs.readFile('backup.txt', 'ascii', function (err, data) {
+        if (!err) {
+          data = data;
+        }
+      });
+    } catch (error) {
+      console.error("Error processing zip file:", error);
+      return res.status(400).send("Invalid zip file format");
+    }
   } else {
     data = importFile.data.toString('ascii');
   }
