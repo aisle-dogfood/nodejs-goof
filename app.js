@@ -10,6 +10,8 @@ var st = require('st');
 var crypto = require('crypto');
 var express = require('express');
 var http = require('http');
+var https = require('https');
+var fs = require('fs');
 var path = require('path');
 var ejsEngine = require('ejs-locals');
 var bodyParser = require('body-parser');
@@ -79,10 +81,34 @@ app.locals.marked = marked;
 if (app.get('env') == 'development') {
   app.use(errorHandler());
 }
-
 var token = 'SECRET_TOKEN_f8ed84e8f41e4146403dd4a6bbcea5e418d23a9';
 console.log('token: ' + token);
 
-http.createServer(app).listen(app.get('port'), function () {
-  console.log('Express server listening on port ' + app.get('port'));
-});
+// Try to use HTTPS for security
+try {
+  const keyPath = path.join(__dirname, 'server.key');
+  const certPath = path.join(__dirname, 'server.cert');
+  
+  if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+    // Use HTTPS if certificates exist
+    const httpsOptions = {
+      key: fs.readFileSync(keyPath),
+      cert: fs.readFileSync(certPath)
+    };
+    https.createServer(httpsOptions, app).listen(app.get('port'), function () {
+      console.log('Express server listening on port ' + app.get('port') + ' (HTTPS)');
+    });
+  } else {
+    // Fall back to HTTP with warning
+    console.warn('SSL certificates not found. Using insecure HTTP server.');
+    http.createServer(app).listen(app.get('port'), function () {
+      console.log('Express server listening on port ' + app.get('port') + ' (HTTP)');
+    });
+  }
+} catch (error) {
+  // Error handling
+  console.error('Error setting up server:', error.message);
+  http.createServer(app).listen(app.get('port'), function () {
+    console.log('Express server listening on port ' + app.get('port'));
+  });
+}
