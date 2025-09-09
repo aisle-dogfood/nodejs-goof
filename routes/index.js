@@ -302,6 +302,12 @@ exports.about_new = function (req, res, next) {
       title: 'Patch TODO List',
       subhead: 'Vulnerabilities at their best',
       device: req.query.device
+    }, function(err, html) {
+      if (err) {
+        console.error('Error rendering dust template:', err);
+        return next(err);
+      }
+      res.send(html);
     });
 };
 
