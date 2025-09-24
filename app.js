@@ -2,6 +2,9 @@
  * Module dependencies.
  */
 
+// Prevent prototype pollution
+Object.freeze(Object.prototype);
+
 // mongoose setup
 require('./mongoose-db');
 require('./typeorm-db')
