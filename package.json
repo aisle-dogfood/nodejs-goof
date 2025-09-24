@@ -8,14 +8,19 @@
     "url": "https://github.com/Snyk/snyk-todo-list-demo-app/"
   },
   "scripts": {
+    "preinstall": "npx add-resolutions",
     "dev": "NODE_OPTIONS=--openssl-legacy-provider nodemon ./app.js",
     "start": "NODE_OPTIONS=--openssl-legacy-provider node app.js",
     "build": "browserify -r jquery > public/js/bundle.js",
     "cleanup": "mongo express-todo --eval 'db.todos.remove({});'",
     "test": "snyk test"
   },
+  "resolutions": {
+    "bl": "^2.2.1"
+  },
   "dependencies": {
     "adm-zip": "0.4.7",
+    "bl": "^2.2.1",
     "body-parser": "1.9.0",
     "cfenv": "^1.0.4",
     "consolidate": "0.14.5",
@@ -49,8 +54,10 @@
     "validator": "^13.5.2"
   },
   "devDependencies": {
+    "add-resolutions": "^1.1.0",
     "browserify": "^13.1.1",
     "nodemon": "^2.0.7",
+    "package-json-validator": "^0.6.3",
     "snyk": "^1.244.0"
   },
   "license": "Apache-2.0"
