@@ -10,4 +10,6 @@ RUN npm update
 RUN npm install
 EXPOSE 3001
 EXPOSE 9229
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+USER appuser
 ENTRYPOINT ["npm", "start"]
