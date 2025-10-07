@@ -42,7 +42,10 @@ app.use(methodOverride());
 app.use(session({
   secret: 'keyboard cat',
   name: 'connect.sid',
-  cookie: { path: '/' }
+  cookie: { 
+    path: '/',
+    sameSite: 'lax'  // Add this line for better security
+  }
 }))
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
