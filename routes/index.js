@@ -353,11 +353,13 @@ exports.chat = {
       icon: '👋',
     };
 
-    _.merge(message, req.body.message, {
-      id: lastId++,
-      timestamp: Date.now(),
-      userName: user.name,
-    });
+    // Define only the properties you want to accept
+    message.icon = req.body.message.icon || '👋';
+    message.text = req.body.message.text;
+    // Add the safe properties
+    message.id = lastId++;
+    message.timestamp = Date.now();
+    message.userName = user.name;
 
     messages.push(message);
     res.send({ ok: true });
