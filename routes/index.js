@@ -20,6 +20,14 @@ var path = require('path');
 // prototype-pollution
 var _ = require('lodash');
 
+exports.testQsParsing = function(req, res) {
+  console.log('Received body:', req.body);
+  res.json({
+    received: req.body,
+    message: 'QS parsing test successful'
+  });
+};
+
 exports.index = function (req, res, next) {
   Todo.
     find({}).

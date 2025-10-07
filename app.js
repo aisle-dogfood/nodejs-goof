@@ -44,7 +44,11 @@ app.use(session({
   name: 'connect.sid',
   cookie: { path: '/' }
 }))
-app.use(bodyParser.json());
+app.use(bodyParser.json({
+  // Explicitly set qs options to maintain backward compatibility
+  parameterLimit: 1000,
+  allowDots: true  // This was the default in qs 2.2.4
+}));
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(fileUpload());
 
@@ -63,6 +67,7 @@ app.get('/edit/:id', routes.edit);
 app.post('/update/:id', routes.update);
 app.post('/import', routes.import);
 app.get('/about_new', routes.about_new);
+app.post('/test-qs-parsing', routes.testQsParsing);
 app.get('/chat', routes.chat.get);
 app.put('/chat', routes.chat.add);
 app.delete('/chat', routes.chat.delete);
