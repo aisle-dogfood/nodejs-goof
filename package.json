@@ -53,5 +53,10 @@
     "nodemon": "^2.0.7",
     "snyk": "^1.244.0"
   },
+  "overrides": {
+    "minimist": "1.2.5",
+    "tap/nyc/istanbul-reports/handlebars/optimist/minimist": "1.2.5",
+    "tap/mkdirp/minimist": "1.2.5"
+  },
   "license": "Apache-2.0"
 }
