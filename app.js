@@ -19,11 +19,17 @@ var logger = require('morgan');
 var errorHandler = require('errorhandler');
 var optional = require('optional');
 var marked = require('marked');
+var createDOMPurify = require('dompurify');
+var { JSDOM } = require('jsdom');
 var fileUpload = require('express-fileupload');
 var dust = require('dustjs-linkedin');
 var dustHelpers = require('dustjs-helpers');
 var cons = require('consolidate');
 const hbs = require('hbs')
+
+// Create DOMPurify instance
+var window = new JSDOM('').window;
+var DOMPurify = createDOMPurify(window);
 
 var app = express();
 var routes = require('./routes');
@@ -72,8 +78,19 @@ app.use('/users', routesUsers)
 app.use(st({ path: './public', url: '/public' }));
 
 // Add the option to output (sanitized!) markdown
-marked.setOptions({ sanitize: true });
-app.locals.marked = marked;
+// The sanitize option is deprecated in marked 4.x
+// Use the following configuration instead for secure rendering
+marked.setOptions({
+  mangle: false, // Disable mangling to prevent potential issues
+  headerIds: false, // Disable automatic header IDs
+});
+// Create a sanitized markdown renderer
+app.locals.marked = {
+  parse: function(src) {
+    // First parse markdown to HTML, then sanitize the HTML
+    return DOMPurify.sanitize(marked.parse(src));
+  }
+};
 
 // development only
 if (app.get('env') == 'development') {
