@@ -265,9 +265,17 @@ exports.import = function (req, res, next) {
         // backup.txt file not found or unreadable, keep default message
       }
     } catch (error) {
-      // Handle the new INVALID_FILENAME error and other extraction errors
+      // Handle specific adm-zip errors (now proper Error instances in v0.5.2)
       console.error('Zip extraction failed:', error.message);
-      res.status(400).send('Invalid zip file uploaded');
+      
+      // More specific error handling based on error types
+      if (error.message && error.message.includes('INVALID_FILENAME')) {
+        res.status(400).send('Invalid filename in zip archive');
+      } else if (error.message && error.message.includes('BAD_CRC')) {
+        res.status(400).send('Corrupted zip file');
+      } else {
+        res.status(400).send('Invalid zip file uploaded');
+      }
       return;
     }
   } else {
