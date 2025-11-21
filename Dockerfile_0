@@ -1,0 +1,26 @@
+FROM public.ecr.aws/docker/library/node:18-slim
+
+# Create app directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy application code
+COPY . .
+
+# Create a non-root user
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -m -s /bin/bash app \
+    && chown -R app:app /app
+
+# Switch to non-root user
+USER app
+
+# Set PATH to include user's node modules
+ENV PATH="/app/node_modules/.bin:$PATH"

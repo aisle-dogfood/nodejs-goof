@@ -42,7 +42,24 @@ app.use(methodOverride());
 app.use(session({
   secret: 'keyboard cat',
   name: 'connect.sid',
-  cookie: { path: '/' }
+  cookie: { 
+    path: '/',
+    // The following options are optional but recommended for security
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
+    sameSite: 'lax' // Helps prevent CSRF attacks
+    // New options available in 1.18.2 (add if needed):
+    // partitioned: false,
+    // priority: 'medium'
+  },
+  // Add error handling for session errors
+  store: {
+    on: function(event, callback) {
+      if (event === 'error') {
+        console.error('Session store error:', callback);
+      }
+    }
+  }
 }))
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -70,6 +87,16 @@ app.use('/users', routesUsers)
 
 // Static
 app.use(st({ path: './public', url: '/public' }));
+
+// Add error handling for asynchronous SetCookie errors
+app.use(function(err, req, res, next) {
+  // Handle session-specific errors
+  if (err.name === 'SessionError') {
+    console.error('Session error:', err);
+    return res.status(500).send('Session error occurred');
+  }
+  next(err);
+});
 
 // Add the option to output (sanitized!) markdown
 marked.setOptions({ sanitize: true });

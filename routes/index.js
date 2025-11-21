@@ -123,9 +123,13 @@ exports.isLoggedIn = function (req, res, next) {
 
 exports.logout = function (req, res, next) {
   req.session.loggedIn = 0
-  req.session.destroy(function() { 
-    return res.redirect('/')  
-  })
+  req.session.destroy(function(err) {
+    if (err) {
+      console.error('Session destruction error:', err);
+      return next(err);
+    }
+    return res.redirect('/');
+  });
 }
 
 function parse(todo) {

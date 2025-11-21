@@ -1,0 +1,27 @@
+FROM public.ecr.aws/docker/library/node:18-slim
+
+# Create a non-root user
+RUN useradd -m -s /bin/bash app
+
+# Set up working directory
+WORKDIR /app
+
+# Copy package files first for better caching
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy the rest of the application
+COPY . .
+
+# Give ownership to the non-root user
+RUN chown -R app:app /app
+
+# Switch to non-root user
+USER app
+
+# Set PATH to include node_modules/.bin
+ENV PATH="/app/node_modules/.bin:$PATH"
+ENV HOME="/home/app"
+ENV PATH="$HOME/.local/bin:$PATH"
