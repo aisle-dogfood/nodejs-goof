@@ -25,3 +25,5 @@ services:
       MYSQL_DATABASE: acme
     ports:
       - "3306:3306"
+    security_opt:
+      - no-new-privileges:true
