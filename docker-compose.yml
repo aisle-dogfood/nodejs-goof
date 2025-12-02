@@ -17,6 +17,8 @@ services:
     image: mongo:3
     ports:
       - "27017:27017"
+    security_opt:
+      - no-new-privileges:true
   good-mysql:
     container_name: goof-mysql
     image: mysql:5
