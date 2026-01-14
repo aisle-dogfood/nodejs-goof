@@ -91,11 +91,15 @@ exports.save_account_details = function(req, res, next) {
   // get the profile details from the JSON
 	const profile = req.body
   // validate the input
-  if (validator.isEmail(profile.email, { allow_display_name: true })
+  if (validator.isEmail(profile.email, { 
+    allow_display_name: true 
+    // Note: validator 13.7.0 has stricter display-name parsing
+  })
     // allow_display_name allows us to receive input as:
     // Display Name <email-address>
     // which we consider valid too
     && validator.isMobilePhone(profile.phone, 'he-IL')
+    // Note: validator 13.7.0 has updated regex patterns for some locales
     && validator.isAscii(profile.firstname)
     && validator.isAscii(profile.lastname)
     && validator.isAscii(profile.country)
