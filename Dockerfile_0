@@ -1,0 +1,21 @@
+FROM public.ecr.aws/docker/library/node:18-alpine
+
+# Create app directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Create a non-root user
+RUN adduser -D app && \
+    chown -R app:app /app
+
+# Switch to app user
+USER app
+ENV PATH="/app/node_modules/.bin:$PATH"
+
+# Copy application code
+COPY --chown=app:app . .

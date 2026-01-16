@@ -1,0 +1,27 @@
+FROM public.ecr.aws/docker/library/node:18-alpine
+
+WORKDIR /app
+
+# Copy package files first to leverage Docker cache
+COPY package*.json ./
+
+# Install only production dependencies to save space
+RUN npm install --only=production && \
+    # Install only the test-specific dev dependencies
+    npm install --no-save snyk jest && \
+    # Clean npm cache to save space
+    npm cache clean --force
+
+# Copy application files needed for tests
+COPY . .
+
+# Create non-root user and set permissions
+RUN adduser -D app && \
+    chown -R app:app /app
+
+USER app
+ENV PATH="/home/app/.local/bin:$PATH"
+
+# Create a directory for test results with proper permissions
+RUN mkdir -p /app/test-results && \
+    chmod -R 777 /app/test-results
