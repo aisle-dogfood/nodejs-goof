@@ -18,7 +18,10 @@ mongoose.model('User', User);
 
 // CloudFoundry env vars
 var mongoCFUri = cfenv.getAppEnv().getServiceURL('goof-mongo');
-console.log(JSON.stringify(cfenv.getAppEnv()));
+// SECURITY FIX: Removed logging of full CloudFoundry environment object
+// The cfenv.getAppEnv() object contains sensitive data including service credentials,
+// API keys, and configuration secrets. Logging this data exposes it to anyone with
+// access to application logs, which could lead to unauthorized access to services.
 
 // Default Mongo URI is local
 const DOCKER = process.env.DOCKER
@@ -40,7 +43,22 @@ if (mongoCFUri) {
   mongoUri = process.env.MONGODB_URI;
 }
 
-console.log("Using Mongo URI " + mongoUri);
+// SECURITY FIX: Redact credentials from MongoDB URI before logging
+// MongoDB connection strings follow the format: mongodb://username:password@host
+// Logging the full URI would expose database credentials in application logs.
+// This function sanitizes the URI by replacing credentials with asterisks.
+function redactUri(uri) {
+  if (!uri) return uri;
+  try {
+    // Replace credentials in mongodb://username:password@host format
+    return uri.replace(/mongodb:\/\/([^:]+):([^@]+)@/, 'mongodb://***:***@');
+  } catch (e) {
+    // If redaction fails for any reason, hide the entire URI to prevent credential exposure
+    return '[REDACTED]';
+  }
+}
+
+console.log("Using Mongo URI " + redactUri(mongoUri));
 
 mongoose.connect(mongoUri);
 
