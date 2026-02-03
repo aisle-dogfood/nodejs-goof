@@ -59,7 +59,7 @@ The `exploits/` directory includes a series of steps to demonstrate each one.
 
 Here are the exploitable vulnerable packages:
 - [Mongoose - Buffer Memory Exposure](https://snyk.io/vuln/npm:mongoose:20160116) - requires a version <= Node.js 8. For the exploit demo purposes, one can update the Dockerfile `node` base image to use `FROM node:6-stretch`.
-- [st - Directory Traversal](https://snyk.io/vuln/npm:st:20140206)
+- ~~[st - Directory Traversal](https://snyk.io/vuln/npm:st:20140206)~~ - **FIXED**: Upgraded from v0.2.4 to v1.4.1 to address directory traversal vulnerabilities (CVE-2014-0206) and vulnerable transitive dependencies (mime, negotiator)
 - [ms - ReDoS](https://snyk.io/vuln/npm:ms:20151024)
 - [marked - XSS](https://snyk.io/vuln/npm:marked:20150520)
 
