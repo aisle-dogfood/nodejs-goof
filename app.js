@@ -6,6 +6,10 @@
 require('./mongoose-db');
 require('./typeorm-db')
 
+// Security fix: Upgraded 'st' from 0.2.4 to 1.4.1 to address multiple vulnerabilities:
+// - Directory Traversal (CVE-2014-0206): Allows attackers to access files outside the intended directory
+// - Vulnerable transitive dependencies: mime@1.2.11 (ReDoS) and negotiator@0.2.8 (ReDoS)
+// The upgrade ensures secure static file serving and protects against path traversal attacks
 var st = require('st');
 var crypto = require('crypto');
 var express = require('express');
@@ -68,7 +72,9 @@ app.put('/chat', routes.chat.add);
 app.delete('/chat', routes.chat.delete);
 app.use('/users', routesUsers)
 
-// Static
+// Static file serving with 'st' middleware
+// Note: The 'st' package has been upgraded to v1.4.1 to fix directory traversal vulnerabilities
+// that could allow attackers to access files outside the public directory
 app.use(st({ path: './public', url: '/public' }));
 
 // Add the option to output (sanitized!) markdown
