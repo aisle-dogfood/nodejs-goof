@@ -69,7 +69,7 @@ exports.login = function (req, res, next) {
   return res.render('admin', {
     title: 'Admin Access',
     granted: false,
-    redirectPage: req.query.redirectPage
+    redirectPage: req.query.redirectPage || ''
   });
 };
 
