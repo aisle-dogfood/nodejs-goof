@@ -2,8 +2,13 @@ var mongoose = require('mongoose');
 var cfenv = require("cfenv");
 var Schema = mongoose.Schema;
 
+// Mongoose 6+ hardening: strip query selectors like `$ne`, `$gt`, and legacy
+// BSON-internal keys like `_bsontype` out of filters.
+mongoose.set('sanitizeFilter', true);
+
 var Todo = new Schema({
-  content: Buffer,
+  // Explicit Buffer type for Mongoose 6+
+  content: Schema.Types.Buffer,
   updated_at: Date,
 });
 
@@ -42,7 +47,9 @@ if (mongoCFUri) {
 
 console.log("Using Mongo URI " + mongoUri);
 
-mongoose.connect(mongoUri);
+mongoose.connect(mongoUri).catch(function (err) {
+  console.error('Mongo connection error:', err);
+});
 
 User = mongoose.model('User');
 User.find({ username: 'admin@snyk.io' }).exec(function (err, users) {
