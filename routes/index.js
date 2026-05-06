@@ -36,19 +36,28 @@ exports.index = function (req, res, next) {
 };
 
 exports.loginHandler = function (req, res, next) {
-  if (validator.isEmail(req.body.username)) {
-    User.find({ username: req.body.username, password: req.body.password }, function (err, users) {
-      if (users.length > 0) {
-        const redirectPage = req.body.redirectPage
-        const session = req.session
-        const username = req.body.username
-        return adminLoginSuccess(redirectPage, session, username, res)
-      } else {
-        return res.status(401).send()
+  const username = req.body && req.body.username;
+  const password = req.body && req.body.password;
+
+  // Prevent operator/object injection in Mongo queries: require primitives.
+  if (typeof username !== 'string' || typeof password !== 'string') {
+    return res.status(401).send();
+  }
+
+  if (validator.isEmail(username)) {
+    User.findOne({ username: username, password: password }).exec(function (err, user) {
+      if (err) return next(err);
+
+      if (user) {
+        const redirectPage = req.body.redirectPage;
+        const session = req.session;
+        return adminLoginSuccess(redirectPage, session, username, res);
       }
+
+      return res.status(401).send();
     });
   } else {
-    return res.status(401).send()
+    return res.status(401).send();
   }
 };
 
@@ -154,8 +163,16 @@ exports.create = function (req, res, next) {
   // console.log('req.body: ' + JSON.stringify(req.body));
 
   var item = req.body.content;
+
+  // Ensure user input is always treated as a string before being cast into a
+  // Buffer field. This avoids numeric Buffer casting edge cases in older
+  // Mongoose versions and prevents storing non-text binary data unexpectedly.
+  if (typeof item !== 'string') {
+    item = String(item);
+  }
+
   var imgRegex = /\!\[alt text\]\((http.*)\s\".*/;
-  if (typeof (item) == 'string' && item.match(imgRegex)) {
+  if (item.match(imgRegex)) {
     var url = item.match(imgRegex)[1];
     console.log('found img: ' + url);
 
@@ -171,7 +188,7 @@ exports.create = function (req, res, next) {
   }
 
   new Todo({
-    content: item,
+    content: Buffer.from(item, 'utf8'),
     updated_at: Date.now(),
   }).save(function (err, todo, count) {
     if (err) return next(err);
@@ -190,14 +207,14 @@ exports.create = function (req, res, next) {
 
 exports.destroy = function (req, res, next) {
   Todo.findById(req.params.id, function (err, todo) {
+    if (err) return next(err);
+    if (!todo) return res.redirect('/');
 
-    try {
-      todo.remove(function (err, todo) {
-        if (err) return next(err);
-        res.redirect('/');
-      });
-    } catch (e) {
-    }
+    // `remove()` is deprecated in newer Mongoose versions.
+    todo.deleteOne(function (err) {
+      if (err) return next(err);
+      res.redirect('/');
+    });
   });
 };
 
@@ -218,8 +235,13 @@ exports.edit = function (req, res, next) {
 
 exports.update = function (req, res, next) {
   Todo.findById(req.params.id, function (err, todo) {
+    if (err) return next(err);
+    if (!todo) return res.redirect('/');
 
-    todo.content = req.body.content;
+    const raw = req.body && req.body.content;
+    const contentStr = (raw === null || typeof raw === 'undefined') ? '' : String(raw);
+
+    todo.content = Buffer.from(contentStr, 'utf8');
     todo.updated_at = Date.now();
     todo.save(function (err, todo, count) {
       if (err) return next(err);
