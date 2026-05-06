@@ -1,15 +1,8 @@
-# FROM node:6-stretch
 FROM node:18.13.0
 
-# Allow operators to align container file ownership with host-mounted volumes.
-# Override these defaults at build time with --build-arg APP_UID=<uid> --build-arg APP_GID=<gid>.
 ARG APP_UID=1000
 ARG APP_GID=1000
 
-# Create a dedicated runtime identity for this application instead of relying on
-# the base image's default account.
-# The UID/GID checks only allow replacing the base image's default `node` ids;
-# any other collision fails the build with a clear error to avoid ambiguity.
 RUN set -eux; \
     existing_group="$(getent group "${APP_GID}" | cut -d: -f1 || true)"; \
     existing_user="$(getent passwd "${APP_UID}" | cut -d: -f1 || true)"; \
@@ -34,11 +27,8 @@ RUN set -eux; \
 COPY . /usr/src/goof
 WORKDIR /usr/src/goof
 
-# Dependency installation still runs as root so npm can write where needed.
-# Ownership is then handed to the runtime user so the app and temp directory stay writable after dropping privileges.
 RUN npm update && npm install && chown -R "${APP_UID}:${APP_GID}" /usr/src/goof /tmp/extracted_files
 EXPOSE 3001
 EXPOSE 9229
-# Drop root before startup so `npm start` and the application process run with least privilege.
 USER goof
 ENTRYPOINT ["npm", "start"]
