@@ -240,12 +240,27 @@ function isBlank(str) {
 }
 
 exports.import = function (req, res, next) {
-  if (!req.files) {
-    res.send('No files were uploaded.');
+  if (!req.files || !req.files.importFile) {
+    res.status(400).send('No files were uploaded.');
     return;
   }
 
-  var importFile = req.files.importFile;
+  // express-fileupload can represent a multi-file field as an array.
+  var importFile = Array.isArray(req.files.importFile)
+    ? req.files.importFile[0]
+    : req.files.importFile;
+
+  // When upload limits are exceeded, newer express-fileupload versions expose truncation.
+  if (importFile && importFile.truncated) {
+    res.status(413).send('Uploaded file was too large.');
+    return;
+  }
+
+  if (!importFile || !importFile.data) {
+    res.status(400).send('Invalid upload.');
+    return;
+  }
+
   var data;
   var importedFileType = fileType(importFile.data);
   var zipFileExt = { ext: "zip", mime: "application/zip" };

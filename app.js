@@ -46,7 +46,15 @@ app.use(session({
 }))
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
-app.use(fileUpload());
+
+// Avoid enabling multipart parsing globally. Only the /import endpoint needs it.
+// Limits help mitigate DoS/crash conditions in multipart parsing.
+var importUploadOptions = {
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
+  abortOnLimit: true,
+  responseOnLimit: 'File too large',
+  uploadTimeout: 10 * 1000, // 10 seconds
+};
 
 // Routes
 app.use(routes.current_user);
@@ -61,7 +69,7 @@ app.post('/create', routes.create);
 app.get('/destroy/:id', routes.destroy);
 app.get('/edit/:id', routes.edit);
 app.post('/update/:id', routes.update);
-app.post('/import', routes.import);
+app.post('/import', fileUpload(importUploadOptions), routes.import);
 app.get('/about_new', routes.about_new);
 app.get('/chat', routes.chat.get);
 app.put('/chat', routes.chat.add);
