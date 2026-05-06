@@ -1,45 +1,84 @@
+const express = require("express")
+const validator = require("validator")
 
-var express = require('express')
-var typeorm = require("typeorm");
+const { AppDataSource, initAppDataSource } = require("../typeorm-db")
 
-var router = express.Router()
+const router = express.Router()
 module.exports = router
 
-router.get('/', async (req, res, next) => {
+function validateAndNormalizeUserPayload(body) {
+  const errors = []
 
-  const mongoConnection = typeorm.getConnection('mysql')
-  const repo = mongoConnection.getRepository("Users")
+  const name = body && typeof body.name === "string" ? body.name.trim() : ""
+  const address = body && typeof body.address === "string" ? body.address.trim() : ""
+  const role = body && typeof body.role === "string" ? body.role.trim() : ""
 
-  // hard-coded getting account id of 1
-  // as a rpelacement to getting this from the session and such
-  // (just imagine that we implemented auth, etc)
-  const results = await repo.find({ id: 1 })
+  if (!validator.isLength(name, { min: 1, max: 100 })) {
+    errors.push("name must be a non-empty string up to 100 characters")
+  }
 
-  // Log Object's where property for debug reasons:
-  console.log('The Object.where property is set to: ', {}.where)
-  console.log(results)
+  if (!validator.isLength(address, { min: 1, max: 200 })) {
+    errors.push("address must be a non-empty string up to 200 characters")
+  }
 
-  return res.json(results)
+  const allowedRoles = new Set(["user", "admin"])
+  if (!allowedRoles.has(role)) {
+    errors.push("role must be one of: user, admin")
+  }
 
+  if (errors.length) {
+    return { ok: false, errors }
+  }
+
+  return {
+    ok: true,
+    value: {
+      name,
+      address,
+      role
+    }
+  }
+}
+
+router.get("/", async (req, res, next) => {
+  try {
+    await initAppDataSource()
+    const repo = AppDataSource.getRepository("Users")
+
+    // hard-coded getting account id of 1
+    // as a replacement to getting this from the session and such
+    // (just imagine that we implemented auth, etc)
+    const results = await repo.findBy({ id: 1 })
+
+    // Log Object's where property for debug reasons:
+    console.log("The Object.where property is set to: ", {}.where)
+    console.log(results)
+
+    return res.json(results)
+  } catch (err) {
+    return next(err)
+  }
 })
 
-router.post('/', async (req, res, next) => {
+router.post("/", async (req, res, next) => {
   try {
-    const mongoConnection = typeorm.getConnection('mysql')
-    const repo = mongoConnection.getRepository("Users")
+    await initAppDataSource()
+    const repo = AppDataSource.getRepository("Users")
 
-    const user = {}
-    user.name = req.body.name
-    user.address = req.body.address
-    user.role = req.body.role
+    const validation = validateAndNormalizeUserPayload(req.body)
+    if (!validation.ok) {
+      return res.status(400).json({ error: "Invalid user payload", details: validation.errors })
+    }
+
+    // Use TypeORM's create() to avoid passing arbitrary/untrusted object shapes into save().
+    const user = repo.create(validation.value)
 
     const savedRecord = await repo.save(user)
     console.log("Post has been saved: ", savedRecord)
     return res.sendStatus(200)
-
   } catch (err) {
     console.error(err)
     console.log({}.where)
-    next();
+    return next(err)
   }
 })
