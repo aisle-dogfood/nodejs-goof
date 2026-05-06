@@ -1,8 +1,14 @@
 FROM node:18.13.0
 
+# Allow the container UID/GID to be overridden at build time so file ownership can
+# match the host or orchestrator expectations for mounted volumes and runtime access.
 ARG APP_UID=1000
 ARG APP_GID=1000
 
+# Create a dedicated application identity instead of running the service as root or
+# relying on the base image defaults.
+# Detect existing users/groups with the requested IDs so the build can safely reuse
+# the base image's default `node` account IDs or fail fast on conflicting identities.
 RUN set -eux; \
     existing_group="$(getent group "${APP_GID}" | cut -d: -f1 || true)"; \
     existing_user="$(getent passwd "${APP_UID}" | cut -d: -f1 || true)"; \
@@ -27,8 +33,12 @@ RUN set -eux; \
 COPY . /usr/src/goof
 WORKDIR /usr/src/goof
 
+# Install dependencies and fix ownership while still running as root so the app
+# directory and temp paths remain writable after dropping privileges.
 RUN npm update && npm install && chown -R "${APP_UID}:${APP_GID}" /usr/src/goof /tmp/extracted_files
 EXPOSE 3001
 EXPOSE 9229
+# Run the application as the dedicated non-root user to reduce the impact of a
+# compromise before the container starts the main process.
 USER goof
 ENTRYPOINT ["npm", "start"]
