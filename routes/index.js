@@ -39,7 +39,8 @@ exports.loginHandler = function (req, res, next) {
   if (validator.isEmail(req.body.username)) {
     User.find({ username: req.body.username, password: req.body.password }, function (err, users) {
       if (users.length > 0) {
-        const redirectPage = req.body.redirectPage
+        // Only allow redirects within this app to avoid open-redirects.
+        const redirectPage = utils.safeRedirectPath(req.body.redirectPage, '/admin')
         const session = req.session
         const username = req.body.username
         return adminLoginSuccess(redirectPage, session, username, res)
@@ -58,18 +59,15 @@ function adminLoginSuccess(redirectPage, session, username, res) {
   // Log the login action for audit
   console.log(`User logged in: ${username}`)
 
-  if (redirectPage) {
-      return res.redirect(redirectPage)
-  } else {
-      return res.redirect('/admin')
-  }
+  return res.redirect(utils.safeRedirectPath(redirectPage, '/admin'))
 }
 
 exports.login = function (req, res, next) {
   return res.render('admin', {
     title: 'Admin Access',
     granted: false,
-    redirectPage: req.query.redirectPage
+    // Keep any redirect target internal and safe (used in a hidden form field).
+    redirectPage: utils.safeRedirectPath(req.query.redirectPage, '/admin')
   });
 };
 
