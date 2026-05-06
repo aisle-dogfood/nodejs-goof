@@ -1,10 +1,13 @@
-var typeorm = require("typeorm");
-var EntitySchema = typeorm.EntitySchema;
+// TypeORM >= 0.3 uses DataSource (createConnection/getConnection are removed)
+const { DataSource, EntitySchema } = require("typeorm");
 
-const Users = require("./entity/Users")
+const Users = require("./entity/Users");
 
-typeorm.createConnection({
-  name: "mysql",
+const UsersEntitySchema = new EntitySchema(Users);
+
+// NOTE: In TypeORM 0.3+ MySQL sets extra.stringifyObjects=true by default.
+// We explicitly disable it to avoid object -> SQL stringification surprises.
+const AppDataSource = new DataSource({
   type: "mysql",
   host: "localhost",
   port: 3306,
@@ -12,35 +15,37 @@ typeorm.createConnection({
   password: "root",
   database: "acme",
   synchronize: true,
-  "logging": true,
-  entities: [
-    new EntitySchema(Users)
-  ]
-}).then(() => {
+  logging: true,
+  extra: {
+    stringifyObjects: false,
+  },
+  entities: [UsersEntitySchema],
+});
 
-  const dbConnection = typeorm.getConnection('mysql')
+const initPromise = AppDataSource.initialize()
+  .then(async () => {
+    const repo = AppDataSource.getRepository(UsersEntitySchema);
 
-  const repo = dbConnection.getRepository("Users")
-  return repo
-}).then((repo) => {
+    console.log(
+      "Seeding 2 users to MySQL users table: Liran (role: user), Simon (role: admin"
+    );
 
+    await Promise.all([
+      repo.insert({ name: "Liran", address: "IL", role: "user" }),
+      repo.insert({ name: "Simon", address: "UK", role: "admin" }),
+    ]);
 
-  console.log('Seeding 2 users to MySQL users table: Liran (role: user), Simon (role: admin')
-  const inserts = [
-    repo.insert({
-      name: "Liran",
-      address: "IL",
-      role: "user"
-    }),
-    repo.insert({
-      name: "Simon",
-      address: "UK",
-      role: "admin"
-    })
-  ];
+    return repo;
+  })
+  .catch((err) => {
+    console.error("failed connecting and seeding users to the MySQL database");
+    console.error(err);
+    // Re-throw so callers awaiting initPromise will fail fast.
+    throw err;
+  });
 
-  return Promise.all(inserts)
-}).catch((err) => {
-  console.error('failed connecting and seeding users to the MySQL database')
-  console.error(err)
-})
+module.exports = {
+  AppDataSource,
+  UsersEntitySchema,
+  initPromise,
+};
