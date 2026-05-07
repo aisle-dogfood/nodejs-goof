@@ -1,5 +1,9 @@
 var DEFAULT_SESSION_COOKIE_MAX_AGE_MS = 60 * 60 * 1000;
 
+/**
+ * Normalize an optional cookie domain from configuration.
+ * Returns undefined to preserve host-only cookies when no domain is configured.
+ */
 function normalizeCookieDomain(domain) {
   if (typeof domain !== 'string') {
     return undefined;
@@ -14,6 +18,10 @@ function normalizeCookieDomain(domain) {
   return normalizedDomain;
 }
 
+/**
+ * Resolve the session cookie lifetime from configuration.
+ * Falls back to a one-hour default when no valid override is provided.
+ */
 function getSessionCookieMaxAge(env) {
   var parsedMaxAge = parseInt(env.SESSION_COOKIE_MAX_AGE_MS, 10);
 
@@ -24,6 +32,10 @@ function getSessionCookieMaxAge(env) {
   return DEFAULT_SESSION_COOKIE_MAX_AGE_MS;
 }
 
+/**
+ * Build the explicit cookie settings used by express-session.
+ * These defaults keep cookies HTTP-only, HTTPS-aware, and time-bounded.
+ */
 function getSessionCookieOptions(env) {
   var runtimeEnv = env || process.env;
 
