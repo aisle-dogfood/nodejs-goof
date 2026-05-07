@@ -17,8 +17,9 @@ strong {font-weight: bold}
 
 <% todos.forEach( function ( todo ){ %>
   <div class="item">
-    <a class="update-link" href="/edit/<%= todo._id %>" title="Update this todo item"><%- marked(new String(todo.content)) %></a>
+    <a class="update-link" href="/edit/<%= todo._id %>" title="Update this todo item"><span class="todo-content" data-rendered-content="<%= todo.renderedContent %>"><%= todo.content %></span></a>
     <a class="del-btn" href="/destroy/<%= todo._id %>" title="Delete this todo item">Delete</a>
   </div>
 <% }); %>
 </div>
+<script src="/public/js/render-markdown.js"></script>
