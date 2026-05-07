@@ -24,6 +24,7 @@ var dust = require('dustjs-linkedin');
 var dustHelpers = require('dustjs-helpers');
 var cons = require('consolidate');
 const hbs = require('hbs')
+var sessionCookieConfig = require('./session-cookie-config');
 
 var app = express();
 var routes = require('./routes');
@@ -37,12 +38,13 @@ app.engine('hbs', hbs.__express);
 cons.dust.helpers = dustHelpers;
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
+app.set('trust proxy', 1);
 app.use(logger('dev'));
 app.use(methodOverride());
 app.use(session({
   secret: 'keyboard cat',
   name: 'connect.sid',
-  cookie: { path: '/' }
+  cookie: sessionCookieConfig.getSessionCookieOptions()
 }))
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
