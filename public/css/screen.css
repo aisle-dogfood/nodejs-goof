@@ -145,22 +145,32 @@ body {
 
 /* line 69, ../sass/screen.sass */
 .content {
+  display: inline;
+  float: left;
   color: #777777;
   font-size: 1.2em;
   text-shadow: 1px 1px 0 white;
+  max-width: 15em;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.content p {
+  margin: 0;
+}
+
+.content a {
+  color: #666666;
 }
 
 /* line 74, ../sass/screen.sass */
 .update-link {
   display: inline;
   float: left;
+  margin-left: 0.75rem;
   font-family: "Lucida Grande", "Lucida Sans Unicode", sans-serif;
   color: #666666;
   text-decoration: none;
-  overflow: hidden;
-  white-space: nowrap;
-  max-width: 15em;
-  text-overflow: ellipsis;
 }
 /* line 83, ../sass/screen.sass */
 .update-link:hover {
