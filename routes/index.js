@@ -27,10 +27,16 @@ exports.index = function (req, res, next) {
     exec(function (err, todos) {
       if (err) return next(err);
 
+      var renderedTodos = todos.map(function (todo) {
+        var renderedTodo = todo.toObject();
+        renderedTodo.renderedContent = encodeURIComponent(utils.renderMarkdown(renderedTodo.content));
+        return renderedTodo;
+      });
+
       res.render('index', {
         title: 'Patch TODO List',
         subhead: 'Vulnerabilities at their best',
-        todos: todos,
+        todos: renderedTodos,
       });
     });
 };

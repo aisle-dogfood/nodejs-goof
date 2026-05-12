@@ -18,7 +18,6 @@ var methodOverride = require('method-override');
 var logger = require('morgan');
 var errorHandler = require('errorhandler');
 var optional = require('optional');
-var marked = require('marked');
 var fileUpload = require('express-fileupload');
 var dust = require('dustjs-linkedin');
 var dustHelpers = require('dustjs-helpers');
@@ -39,8 +38,11 @@ app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
 app.use(logger('dev'));
 app.use(methodOverride());
+
+var sessionSecret = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
+
 app.use(session({
-  secret: 'keyboard cat',
+  secret: sessionSecret,
   name: 'connect.sid',
   cookie: { path: '/' }
 }))
@@ -71,17 +73,10 @@ app.use('/users', routesUsers)
 // Static
 app.use(st({ path: './public', url: '/public' }));
 
-// Add the option to output (sanitized!) markdown
-marked.setOptions({ sanitize: true });
-app.locals.marked = marked;
-
 // development only
 if (app.get('env') == 'development') {
   app.use(errorHandler());
 }
-
-var token = 'SECRET_TOKEN_f8ed84e8f41e4146403dd4a6bbcea5e418d23a9';
-console.log('token: ' + token);
 
 http.createServer(app).listen(app.get('port'), function () {
   console.log('Express server listening on port ' + app.get('port'));
