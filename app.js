@@ -14,6 +14,7 @@ var path = require('path');
 var ejsEngine = require('ejs-locals');
 var bodyParser = require('body-parser');
 var session = require('express-session')
+var sessionConfig = require('./session-config');
 var methodOverride = require('method-override');
 var logger = require('morgan');
 var errorHandler = require('errorhandler');
@@ -39,11 +40,15 @@ app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
 app.use(logger('dev'));
 app.use(methodOverride());
-app.use(session({
-  secret: 'keyboard cat',
-  name: 'connect.sid',
-  cookie: { path: '/' }
-}))
+
+var sessionOptions = sessionConfig.buildSessionOptions({
+  secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
+});
+if (sessionOptions.proxy) {
+  app.set('trust proxy', 1);
+}
+
+app.use(session(sessionOptions))
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(fileUpload());
