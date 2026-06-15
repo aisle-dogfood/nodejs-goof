@@ -31,6 +31,12 @@
 heroku addons:create mongolab:sandbox
 ```
 
+8. Configure proxy-aware HTTPS enforcement because Heroku terminates TLS before the app process:
+
+```
+heroku config:set TRUST_PROXY=1 CANONICAL_HOST=<your-app-hostname>
+```
+
 9. Push the Goof app to be deployed on the heroku platform
 
 ```
