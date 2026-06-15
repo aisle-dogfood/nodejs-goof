@@ -9,8 +9,8 @@ require('./typeorm-db')
 var st = require('st');
 var crypto = require('crypto');
 var express = require('express');
-var http = require('http');
 var path = require('path');
+var httpsServer = require('./https-server');
 var ejsEngine = require('ejs-locals');
 var bodyParser = require('body-parser');
 var session = require('express-session')
@@ -28,9 +28,24 @@ const hbs = require('hbs')
 var app = express();
 var routes = require('./routes');
 var routesUsers = require('./routes/users.js')
+var isProxyTlsEnabled = httpsServer.isProxyTlsEnabled;
+var createHttpsServer = httpsServer.createHttpsServer;
+var getHttpsRedirectLocation = httpsServer.getHttpsRedirectLocation;
 
 // all environments
 app.set('port', process.env.PORT || 3001);
+if (isProxyTlsEnabled(process.env)) {
+  var httpsRedirectLocation = getHttpsRedirectLocation(process.env, '');
+
+  app.set('trust proxy', process.env.TRUST_PROXY);
+  app.use(function (req, res, next) {
+    if (req.secure) {
+      return next();
+    }
+
+    return res.redirect(301, httpsRedirectLocation + req.originalUrl);
+  });
+}
 app.engine('ejs', ejsEngine);
 app.engine('dust', cons.dust);
 app.engine('hbs', hbs.__express);
@@ -83,6 +98,12 @@ if (app.get('env') == 'development') {
 var token = 'SECRET_TOKEN_f8ed84e8f41e4146403dd4a6bbcea5e418d23a9';
 console.log('token: ' + token);
 
-http.createServer(app).listen(app.get('port'), function () {
-  console.log('Express server listening on port ' + app.get('port'));
-});
+if (isProxyTlsEnabled(process.env)) {
+  app.listen(app.get('port'), function () {
+    console.log('Express server listening on port ' + app.get('port'));
+  });
+} else {
+  createHttpsServer(app).listen(app.get('port'), function () {
+    console.log('Express server listening on port ' + app.get('port'));
+  });
+}

