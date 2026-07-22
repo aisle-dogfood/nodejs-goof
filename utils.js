@@ -1,3 +1,37 @@
+var marked = require('marked');
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function renderTodoContent(content) {
+  var renderer = new marked.Renderer();
+
+  // Todos are already wrapped in an edit link, so nested user-controlled links
+  // and images are rendered as text instead of emitting unsafe href/src values.
+  renderer.link = function (href, title, text) {
+    return text;
+  };
+
+  renderer.image = function (href, title, text) {
+    return escapeHtml(text || '');
+  };
+
+  renderer.html = function (html) {
+    return escapeHtml(html);
+  };
+
+  return marked(String(content == null ? '' : content), {
+    sanitize: true,
+    renderer: renderer,
+  });
+}
+
 module.exports = {
 
   ran_no : function ( min, max ){
@@ -24,5 +58,9 @@ module.exports = {
     res.setHeader( 'Content-Type', 'text/plain' );
     res.setHeader( 'Content-Length', body.length );
     res.end( body );
+  },
+
+  renderTodoContent: function (content) {
+    return renderTodoContent(content);
   }
 };
