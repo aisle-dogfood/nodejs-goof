@@ -10,6 +10,7 @@ var readline = require('readline');
 var moment = require('moment');
 var exec = require('child_process').exec;
 var validator = require('validator');
+var crypto = require('crypto');
 
 // zip-slip
 var fileType = require('file-type');
@@ -35,22 +36,75 @@ exports.index = function (req, res, next) {
     });
 };
 
-exports.loginHandler = function (req, res, next) {
-  if (validator.isEmail(req.body.username)) {
-    User.find({ username: req.body.username, password: req.body.password }, function (err, users) {
-      if (users.length > 0) {
-        const redirectPage = req.body.redirectPage
-        const session = req.session
-        const username = req.body.username
-        return adminLoginSuccess(redirectPage, session, username, res)
-      } else {
-        return res.status(401).send()
-      }
-    });
-  } else {
-    return res.status(401).send()
+function isStringCredential(value) {
+  return typeof value === 'string';
+}
+
+function normalizeUsername(username) {
+  return username.trim().toLowerCase();
+}
+
+function hashPassword(password) {
+  return crypto.createHash('sha256').update(password, 'utf8').digest();
+}
+
+function timingSafePasswordMatch(storedPassword, suppliedPassword) {
+  if (!isStringCredential(storedPassword) || !isStringCredential(suppliedPassword)) {
+    return false;
   }
+
+  var storedHash = hashPassword(storedPassword);
+  var suppliedHash = hashPassword(suppliedPassword);
+
+  if (typeof crypto.timingSafeEqual === 'function') {
+    return crypto.timingSafeEqual(storedHash, suppliedHash);
+  }
+
+  var mismatch = 0;
+  for (var i = 0; i < storedHash.length; i++) {
+    mismatch |= storedHash[i] ^ suppliedHash[i];
+  }
+
+  return mismatch === 0;
+}
+
+exports.loginHandler = function (req, res, next) {
+  var username = req.body && req.body.username;
+  var password = req.body && req.body.password;
+
+  if (!isStringCredential(username) || !isStringCredential(password)) {
+    return res.status(401).send();
+  }
+
+  var normalizedUsername = normalizeUsername(username);
+  if (!validator.isEmail(normalizedUsername)) {
+    return res.status(401).send();
+  }
+
+  User.findOne({ username: normalizedUsername }, function (err, user) {
+    if (err) return next(err);
+
+    if (!user || !timingSafePasswordMatch(user.password, password)) {
+      return res.status(401).send();
+    }
+
+    const redirectPage = req.body.redirectPage
+    const session = req.session
+    return adminLoginSuccess(redirectPage, session, normalizedUsername, res)
+  });
 };
+
+function safeRedirectTarget(target) {
+  if (typeof target !== 'string') {
+    return null;
+  }
+
+  if (target.charAt(0) !== '/' || target.indexOf('//') === 0 || target.indexOf('\\') !== -1) {
+    return null;
+  }
+
+  return target;
+}
 
 function adminLoginSuccess(redirectPage, session, username, res) {
   session.loggedIn = 1
@@ -58,11 +112,8 @@ function adminLoginSuccess(redirectPage, session, username, res) {
   // Log the login action for audit
   console.log(`User logged in: ${username}`)
 
-  if (redirectPage) {
-      return res.redirect(redirectPage)
-  } else {
-      return res.redirect('/admin')
-  }
+  var target = safeRedirectTarget(redirectPage) || '/admin';
+  return res.redirect(target)
 }
 
 exports.login = function (req, res, next) {
