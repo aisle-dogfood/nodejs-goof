@@ -1,3 +1,5 @@
+var validator = require('validator');
+
 module.exports = {
 
   ran_no : function ( min, max ){
@@ -24,5 +26,28 @@ module.exports = {
     res.setHeader( 'Content-Type', 'text/plain' );
     res.setHeader( 'Content-Length', body.length );
     res.end( body );
+  },
+
+  extractMarkdownImageUrl : function ( item ){
+    if ( typeof item !== 'string' ) {
+      return null;
+    }
+
+    var imgRegex = /^\!\[alt text\]\((\S+)\s\"[^\"]*\"\)$/;
+    var match = item.match( imgRegex );
+    if ( !match ) {
+      return null;
+    }
+
+    var imageUrl = match[1];
+    if ( !validator.isURL( imageUrl, {
+      protocols: ['http', 'https'],
+      require_protocol: true,
+      require_valid_protocol: true,
+    })) {
+      return null;
+    }
+
+    return imageUrl;
   }
 };
