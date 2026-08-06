@@ -13,9 +13,6 @@ var validator = require('validator');
 
 // zip-slip
 var fileType = require('file-type');
-var AdmZip = require('adm-zip');
-var fs = require('fs');
-var path = require('path');
 
 // prototype-pollution
 var _ = require('lodash');
@@ -240,39 +237,42 @@ function isBlank(str) {
 }
 
 exports.import = function (req, res, next) {
-  if (!req.files) {
-    res.send('No files were uploaded.');
+  if (!req.files || !req.files.importFile) {
+    res.status(400).send('No import file was uploaded.');
     return;
   }
 
   var importFile = req.files.importFile;
+  if (!importFile.data || typeof importFile.data.length !== 'number') {
+    res.status(400).send('Invalid import file uploaded');
+    return;
+  }
+
+  if (utils.isImportFileTooLarge(importFile)) {
+    res.status(413).send('Import file is too large');
+    return;
+  }
+
   var data;
   var importedFileType = fileType(importFile.data);
-  var zipFileExt = { ext: "zip", mime: "application/zip" };
+  var zipFileExt = { ext: 'zip', mime: 'application/zip' };
   if (importedFileType === null) {
-    importedFileType = { ext: "txt", mime: "text/plain" };
+    importedFileType = { ext: 'txt', mime: 'text/plain' };
   }
-  if (importedFileType["mime"] === zipFileExt["mime"]) {
-    var zip = AdmZip(importFile.data);
-    var extracted_path = "/tmp/extracted_files";
-    
-    try {
-      zip.extractAllTo(extracted_path, true);
-      data = "No backup.txt file found";
-      try {
-        data = fs.readFileSync(path.join(extracted_path, 'backup.txt'), 'ascii');
-      } catch (readErr) {
-        // backup.txt file not found or unreadable, keep default message
-      }
-    } catch (error) {
-      // Handle the new INVALID_FILENAME error and other extraction errors
-      console.error('Zip extraction failed:', error.message);
-      res.status(400).send('Invalid zip file uploaded');
-      return;
-    }
-  } else {
-    data = importFile.data.toString('ascii');
+
+  if (importedFileType.mime === zipFileExt.mime) {
+    res.status(415).send('Zip imports are not supported');
+    return;
   }
+
+  data = importFile.data.toString('ascii');
+
+  var importTextValidationError = utils.validateImportText(data);
+  if (importTextValidationError) {
+    res.status(413).send(importTextValidationError);
+    return;
+  }
+
   var lines = data.split('\n');
   lines.forEach(function (line) {
     var parts = line.split(',');
