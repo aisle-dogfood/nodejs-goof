@@ -13,9 +13,90 @@ var validator = require('validator');
 
 // zip-slip
 var fileType = require('file-type');
-var AdmZip = require('adm-zip');
-var fs = require('fs');
 var path = require('path');
+var Worker = require('worker_threads').Worker;
+
+var MAX_IMPORT_ARCHIVE_BYTES = 1024 * 1024;
+var MAX_CONCURRENT_ZIP_IMPORTS = 2;
+var activeZipImportWorkers = 0;
+var ZIP_IMPORT_WORKER_PATH = path.join(__dirname, '..', 'service', 'zip-import-worker.js');
+var ZIP_IMPORT_WORKER_TIMEOUT_MS = 1000;
+var ZIP_IMPORT_WORKER_MEMORY_MB = 32;
+
+function readImportDataFromZip(zipBuffer) {
+  return new Promise(function (resolve, reject) {
+    var settled = false;
+    var worker;
+    var timeout;
+
+    if (activeZipImportWorkers >= MAX_CONCURRENT_ZIP_IMPORTS) {
+      reject(new Error('Too many concurrent zip imports'));
+      return;
+    }
+
+    activeZipImportWorkers += 1;
+
+    function settle(error, data) {
+      activeZipImportWorkers -= 1;
+      if (error) {
+        reject(error);
+      } else {
+        resolve(data);
+      }
+    }
+
+    try {
+      worker = new Worker(ZIP_IMPORT_WORKER_PATH, {
+        workerData: zipBuffer,
+        resourceLimits: {
+          maxOldGenerationSizeMb: ZIP_IMPORT_WORKER_MEMORY_MB
+        }
+      });
+    } catch (error) {
+      settle(error);
+      return;
+    }
+
+    timeout = setTimeout(function () {
+      finish(new Error('Zip processing timed out'));
+    }, ZIP_IMPORT_WORKER_TIMEOUT_MS);
+
+    function finish(error, data) {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      clearTimeout(timeout);
+      worker.removeAllListeners('message');
+      worker.removeAllListeners('error');
+      worker.removeAllListeners('exit');
+      worker.terminate().then(function () {
+        settle(error, data);
+      }, function () {
+        settle(error, data);
+      });
+    }
+
+    worker.on('message', function (message) {
+      if (message && message.error) {
+        finish(new Error(message.error));
+      } else {
+        finish(null, message.data);
+      }
+    });
+
+    worker.on('error', function (error) {
+      finish(error);
+    });
+
+    worker.on('exit', function (code) {
+      if (!settled && code !== 0) {
+        finish(new Error('Zip processing failed'));
+      }
+    });
+  });
+}
 
 // prototype-pollution
 var _ = require('lodash');
@@ -240,68 +321,65 @@ function isBlank(str) {
 }
 
 exports.import = function (req, res, next) {
+  function importTodos(data) {
+    var lines = data.split('\n');
+    lines.forEach(function (line) {
+      var parts = line.split(',');
+      var what = parts[0];
+      console.log('importing ' + what);
+      var when = parts[1];
+      var locale = parts[2];
+      var format = parts[3];
+      var item = what;
+      if (!isBlank(what)) {
+        if (!isBlank(when) && !isBlank(locale) && !isBlank(format)) {
+          console.log('setting locale ' + parts[1]);
+          moment.locale(locale);
+          var d = moment(when);
+          console.log('formatting ' + d);
+          item += ' [' + d.format(format) + ']';
+        }
+
+        new Todo({
+          content: item,
+          updated_at: Date.now(),
+        }).save(function (err, todo, count) {
+          if (err) return next(err);
+          console.log('added ' + todo);
+        });
+      }
+    });
+
+    res.redirect('/');
+  }
+
   if (!req.files) {
     res.send('No files were uploaded.');
     return;
   }
 
   var importFile = req.files.importFile;
-  var data;
   var importedFileType = fileType(importFile.data);
   var zipFileExt = { ext: "zip", mime: "application/zip" };
   if (importedFileType === null) {
     importedFileType = { ext: "txt", mime: "text/plain" };
   }
   if (importedFileType["mime"] === zipFileExt["mime"]) {
-    var zip = AdmZip(importFile.data);
-    var extracted_path = "/tmp/extracted_files";
-    
-    try {
-      zip.extractAllTo(extracted_path, true);
-      data = "No backup.txt file found";
-      try {
-        data = fs.readFileSync(path.join(extracted_path, 'backup.txt'), 'ascii');
-      } catch (readErr) {
-        // backup.txt file not found or unreadable, keep default message
-      }
-    } catch (error) {
-      // Handle the new INVALID_FILENAME error and other extraction errors
-      console.error('Zip extraction failed:', error.message);
+    if (!Buffer.isBuffer(importFile.data) || importFile.data.length > MAX_IMPORT_ARCHIVE_BYTES) {
       res.status(400).send('Invalid zip file uploaded');
       return;
     }
-  } else {
-    data = importFile.data.toString('ascii');
+
+    readImportDataFromZip(importFile.data).then(function (data) {
+      importTodos(data);
+    }).catch(function (error) {
+      console.error('Zip extraction failed:', error.message);
+      res.status(400).send('Invalid zip file uploaded');
+    });
+    return;
   }
-  var lines = data.split('\n');
-  lines.forEach(function (line) {
-    var parts = line.split(',');
-    var what = parts[0];
-    console.log('importing ' + what);
-    var when = parts[1];
-    var locale = parts[2];
-    var format = parts[3];
-    var item = what;
-    if (!isBlank(what)) {
-      if (!isBlank(when) && !isBlank(locale) && !isBlank(format)) {
-        console.log('setting locale ' + parts[1]);
-        moment.locale(locale);
-        var d = moment(when);
-        console.log('formatting ' + d);
-        item += ' [' + d.format(format) + ']';
-      }
 
-      new Todo({
-        content: item,
-        updated_at: Date.now(),
-      }).save(function (err, todo, count) {
-        if (err) return next(err);
-        console.log('added ' + todo);
-      });
-    }
-  });
-
-  res.redirect('/');
+  importTodos(importFile.data.toString('ascii'));
 };
 
 exports.about_new = function (req, res, next) {
