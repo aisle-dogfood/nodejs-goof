@@ -20,6 +20,7 @@ var errorHandler = require('errorhandler');
 var optional = require('optional');
 var marked = require('marked');
 var fileUpload = require('express-fileupload');
+var utils = require('./utils');
 var dust = require('dustjs-linkedin');
 var dustHelpers = require('dustjs-helpers');
 var cons = require('consolidate');
@@ -44,9 +45,9 @@ app.use(session({
   name: 'connect.sid',
   cookie: { path: '/' }
 }))
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(fileUpload());
+app.use(bodyParser.json(utils.getBodyParserOptions()));
+app.use(bodyParser.urlencoded(utils.getUrlEncodedParserOptions()));
+app.use(fileUpload(utils.getFileUploadOptions()));
 
 // Routes
 app.use(routes.current_user);
