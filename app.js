@@ -25,6 +25,8 @@ var dustHelpers = require('dustjs-helpers');
 var cons = require('consolidate');
 const hbs = require('hbs')
 
+var MAX_IMPORT_UPLOAD_BYTES = 1024 * 1024;
+
 var app = express();
 var routes = require('./routes');
 var routesUsers = require('./routes/users.js')
@@ -46,7 +48,11 @@ app.use(session({
 }))
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
-app.use(fileUpload());
+app.use(fileUpload({
+  limits: {
+    fileSize: MAX_IMPORT_UPLOAD_BYTES
+  }
+}));
 
 // Routes
 app.use(routes.current_user);
