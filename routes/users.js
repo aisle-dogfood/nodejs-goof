@@ -1,45 +1,78 @@
-
 var express = require('express')
-var typeorm = require("typeorm");
+var validator = require('validator')
+
+const { mysqlDataSource, mysqlDataSourceReady, UsersSchema } = require('../typeorm-db')
 
 var router = express.Router()
 module.exports = router
 
+function getTrimmedString(body, key) {
+  if (!body || typeof body[key] !== 'string') return null
+  return body[key].trim()
+}
+
+function validateUserPayload(body) {
+  const name = getTrimmedString(body, 'name')
+  const address = getTrimmedString(body, 'address')
+  const role = getTrimmedString(body, 'role')
+
+  if (!name || !validator.isLength(name, { min: 1, max: 255 })) {
+    return { error: 'Invalid name' }
+  }
+
+  if (!address || !validator.isLength(address, { min: 1, max: 255 })) {
+    return { error: 'Invalid address' }
+  }
+
+  if (!role) {
+    return { error: 'Invalid role' }
+  }
+
+  const normalizedRole = role.toLowerCase()
+  if (!validator.isIn(normalizedRole, ['user', 'admin'])) {
+    return { error: 'Invalid role' }
+  }
+
+  // Return only a whitelisted set of fields.
+  return { name, address, role: normalizedRole }
+}
+
 router.get('/', async (req, res, next) => {
+  try {
+    await mysqlDataSourceReady
 
-  const mongoConnection = typeorm.getConnection('mysql')
-  const repo = mongoConnection.getRepository("Users")
+    const repo = mysqlDataSource.getRepository(UsersSchema)
 
-  // hard-coded getting account id of 1
-  // as a rpelacement to getting this from the session and such
-  // (just imagine that we implemented auth, etc)
-  const results = await repo.find({ id: 1 })
+    // TypeORM v0.3+: find() no longer accepts a plain conditions object.
+    const results = await repo.findBy({ id: 1 })
 
-  // Log Object's where property for debug reasons:
-  console.log('The Object.where property is set to: ', {}.where)
-  console.log(results)
+    // Log Object's where property for debug reasons:
+    console.log('The Object.where property is set to: ', {}.where)
+    console.log(results)
 
-  return res.json(results)
-
+    return res.json(results)
+  } catch (err) {
+    return next(err)
+  }
 })
 
 router.post('/', async (req, res, next) => {
   try {
-    const mongoConnection = typeorm.getConnection('mysql')
-    const repo = mongoConnection.getRepository("Users")
+    await mysqlDataSourceReady
 
-    const user = {}
-    user.name = req.body.name
-    user.address = req.body.address
-    user.role = req.body.role
+    const repo = mysqlDataSource.getRepository(UsersSchema)
 
-    const savedRecord = await repo.save(user)
-    console.log("Post has been saved: ", savedRecord)
+    const validatedUser = validateUserPayload(req.body)
+    if (validatedUser.error) {
+      return res.status(400).json({ error: validatedUser.error })
+    }
+
+    const savedRecord = await repo.save(validatedUser)
+    console.log('Post has been saved: ', savedRecord)
     return res.sendStatus(200)
-
   } catch (err) {
     console.error(err)
     console.log({}.where)
-    next();
+    return next(err)
   }
 })
