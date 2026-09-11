@@ -19,6 +19,7 @@ var logger = require('morgan');
 var errorHandler = require('errorhandler');
 var optional = require('optional');
 var marked = require('marked');
+var sanitizeHtml = require('sanitize-html');
 var fileUpload = require('express-fileupload');
 var dust = require('dustjs-linkedin');
 var dustHelpers = require('dustjs-helpers');
@@ -74,6 +75,7 @@ app.use(st({ path: './public', url: '/public' }));
 // Add the option to output (sanitized!) markdown
 marked.setOptions({ sanitize: true });
 app.locals.marked = marked;
+app.locals.sanitize = sanitizeHtml;
 
 // development only
 if (app.get('env') == 'development') {
