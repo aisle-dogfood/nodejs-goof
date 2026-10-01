@@ -20,6 +20,28 @@ var path = require('path');
 // prototype-pollution
 var _ = require('lodash');
 
+/**
+ * Allow-list redirect targets.
+ *
+ * We only allow absolute-path redirects within this application to avoid
+ * open-redirects and to avoid passing malformed URLs into res.redirect().
+ */
+function getSafeRedirectPath(redirectPage) {
+  if (typeof redirectPage !== 'string') return null;
+
+  const value = redirectPage.trim();
+  if (!value) return null;
+
+  // Only allow absolute-path redirects on the current origin.
+  // Reject protocol-relative URLs (//evil.com) and any backslashes.
+  if (!value.startsWith('/')) return null;
+  if (value.startsWith('//')) return null;
+  if (value.includes('\\')) return null;
+  if (/[\r\n]/.test(value)) return null;
+
+  return value;
+}
+
 exports.index = function (req, res, next) {
   Todo.
     find({}).
@@ -39,7 +61,7 @@ exports.loginHandler = function (req, res, next) {
   if (validator.isEmail(req.body.username)) {
     User.find({ username: req.body.username, password: req.body.password }, function (err, users) {
       if (users.length > 0) {
-        const redirectPage = req.body.redirectPage
+        const redirectPage = getSafeRedirectPath(req.body.redirectPage)
         const session = req.session
         const username = req.body.username
         return adminLoginSuccess(redirectPage, session, username, res)
@@ -69,7 +91,7 @@ exports.login = function (req, res, next) {
   return res.render('admin', {
     title: 'Admin Access',
     granted: false,
-    redirectPage: req.query.redirectPage
+    redirectPage: getSafeRedirectPath(req.query.redirectPage)
   });
 };
 
