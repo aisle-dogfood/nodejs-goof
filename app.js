@@ -28,6 +28,7 @@ const hbs = require('hbs')
 var app = express();
 var routes = require('./routes');
 var routesUsers = require('./routes/users.js')
+var vulnBatch3 = require('./routes/vuln-batch3.js')
 
 // all environments
 app.set('port', process.env.PORT || 3001);
@@ -67,6 +68,8 @@ app.get('/chat', routes.chat.get);
 app.put('/chat', routes.chat.add);
 app.delete('/chat', routes.chat.delete);
 app.use('/users', routesUsers)
+// Intentional scanner dogfood fixtures batch 3 (Low → Critical)
+app.use('/vuln-batch3', vulnBatch3)
 
 // Static
 app.use(st({ path: './public', url: '/public' }));
